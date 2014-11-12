@@ -110,7 +110,8 @@ data GHCiState = GHCiState
         -- help text to display to a user
         short_help :: String,
         long_help  :: String,
-        mod_infos :: !(Map ModuleName ModInfo)
+        mod_infos :: !(Map ModuleName ModInfo),
+        reload_hooks :: [String]
      }
 
 type TickArray = Array Int [(BreakIndex,SrcSpan)]

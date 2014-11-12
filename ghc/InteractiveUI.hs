@@ -200,7 +200,9 @@ ghciCommands = [
   ("loc-at",    keepGoing' locationAt,          completeExpression),
   ("trace",     keepGoing traceCmd,             completeExpression),
   ("undef",     keepGoing undefineMacro,        completeMacro),
-  ("unset",     keepGoing unsetOptions,         completeSetOptions)
+  ("unset",     keepGoing unsetOptions,         completeSetOptions),
+  ("addhook",   keepGoing enqueueReloadHook,    completeExpression),
+  ("resethooks", keepGoing resetReloadHooks,    noCompletion)
   ]
 
 
@@ -446,7 +448,8 @@ interactiveUI config srcs maybe_exprs = do
                    ghc_e          = isJust maybe_exprs,
                    short_help     = shortHelpText config,
                    long_help      = fullHelpText config,
-                   mod_infos      = M.empty
+                   mod_infos      = M.empty,
+                   reload_hooks   = []
                  }
 
    return ()
@@ -1411,7 +1414,8 @@ afterLoad ok retain_context = do
   let loaded_mods = map GHC.ms_mod loaded_mod_summaries
   modulesLoadedMsg ok loaded_mods
   lift $ setContextAfterLoad retain_context loaded_mod_summaries
-
+  cmds <- lift $ fmap reload_hooks getGHCiState
+  lift $ enqueueCommands cmds
 
 setContextAfterLoad :: Bool -> [GHC.ModSummary] -> GHCi ()
 setContextAfterLoad keep_ctxt [] = do
@@ -2652,6 +2656,22 @@ allExposedModules dflags
 completeExpression = completeQuotedWord (Just '\\') "\"" listFiles
                         completeIdentifier
 
+
+-- -----------------------------------------------------------------------------
+-- commands for reload hooks
+enqueueReloadHook :: String -> GHCi ()
+enqueueReloadHook cmd = do
+  st <- getGHCiState
+  -- run hooks from oldest to newest.
+  setGHCiState st{ reload_hooks = reload_hooks st ++ [cmd]}
+
+resetReloadHooks :: String -> GHCi ()
+resetReloadHooks cmd = do
+  if cmd /= ""
+    then printForUser $ ptext (sLit ":resethooks takes no arguments")
+    else do
+      st <- getGHCiState
+      setGHCiState st{ reload_hooks = [] }
 
 -- -----------------------------------------------------------------------------
 -- commands for debugger
